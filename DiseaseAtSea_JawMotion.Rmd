@@ -1,0 +1,233 @@
+---
+title: "SickSeal_6018"
+author: "T.Adachi, R.Holser"
+date: "20211029"
+output: 
+  html_document:
+    toc: true
+---
+
+
+<style type="text/css">
+.main-container {
+  max-width: 10000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+options(encoding = "utf-8")
+
+
+## MEMO
+- This rmd file is made based on Kami_Matome.rmd for Adachi et al. 2021
+  - Modified by R.Holser on 4-Aug-2022 for Holser et al. 2022
+
+
+## Setting
+```{r setting, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r timelog, echo = FALSE}
+print(paste("updated at", Sys.time(), sep = " "))
+```
+
+## Libraries
+```{r results = "asis", echo=FALSE,warning=FALSE, message = FALSE}
+library(ggplot2)
+library(tidyverse)
+library(data.table)
+library(patchwork)
+library(ggthemes)
+```
+
+## Data loading
+- Load dat_default.csv
+  - daily summary
+  - For now, this is made in Kami_Matome.rmd 
+  - the original data is located at 
+    - E:\\imtaiky\\Desktop\\Data\\20190129_KamiMatome\\OutputWv_from_IGOR
+
+```{r data loading, results = "asis", echo=FALSE,warning=FALSE, message = FALSE}
+#Daily data----
+dat_default <- read.csv(file = paste(getwd(), "dat_default.csv", sep="/"))
+#Mesopelagic => Pelagic for naming
+dat_default$group <- str_replace_all(dat_default$group, pattern = "Mesopelagic", replacement = "Pelagic")
+#6108 => 6018
+dat_default$sealID <- gsub("ID_2017_PB_6108", "ID_2017_PB_6018", dat_default$sealID)
+
+#save folder
+dirToSave = paste(getwd(), "Results", sep="/")
+
+#post-breeding seals
+dat_PB <- filter(dat_default,
+                 dat_default$PBorPM == "PB" &
+                 dat_default$indID!=5 & ## ID_2011_PM_T35 
+                 dat_default$indID!=55 & ## no data (9678))
+                 dat_default$indID!=56 & ## no data (R415)
+                 dat_default$indID!=66) ## strange data with minus values of bathy (4441)?@
+#
+dat_PB <- filter(dat_PB,
+                 dat_PB$KamiNoSumPerDay != 0 &
+                 dat_PB$ForDiveDurationSum != 0)
+#group2
+dat_PB$group2 = dat_PB$group
+dat_PB$group2 <- gsub("Pelagic", "Control", dat_PB$group2)
+dat_PB$group2 <- gsub("Benthic", "Control", dat_PB$group2)
+
+#All Kami data points----
+##read z-----
+z <- fread(file="z.txt")
+z$indID2 <- gsub("2017_PB_6108", "2017_PB_6018", z$indID2)
+#add PB or PM
+a <- grep("PB",z$indID2,value=F)
+z$PBorPM[a] = 1
+a <- grep("PM",z$indID2,value=F)
+z$PBorPM[a] = 2
+#add benthic/pelagic/sick
+#meso
+z$group <- rep("Pelagic",times=length(z$Day))
+#bathy
+a <- grep("X822",z$indID2,value=F)
+z$group[a] = "Benthic"
+a <- grep("X823",z$indID2,value=F)
+z$group[a] = "Benthic"
+a <- grep("5712",z$indID2,value=F)
+z$group[a] = "Benthic"  
+#sick
+a <- grep("6018",z$indID2,value=F)
+z$group[a] = "Sick"
+#z_default
+  z_default <- z
+##read z2-----
+z2 <- fread(file="z2.txt")
+#add KamiNo to z_default
+z_default$KamiNo <- z2$KamiNo
+z2_default <- z_default  
+#post-breeding seals
+cond <- (z2_default$PBorPM == 1 & 
+           z2_default$indID!=5 & 
+           z2_default$indID!=55 & # no data (9678)
+           z2_default$indID!=56 & # no data (R415)
+           z2_default$indID!=66) # strange data with minus values of bathy (4441)
+z2_PB <- z2_default[cond,]
+#group2
+z2_PB$group2 = z2_PB$group
+z2_PB$group2 <- gsub("Pelagic", "Control", z2_PB$group2)
+z2_PB$group2 <- gsub("Benthic", "Control", z2_PB$group2)
+
+```
+
+
+```{r}
+Seals<-unique(dat_PB$sealID)
+Kamis<-vector(mode="numeric",length=length(Seals))
+MeanKamis<-vector(mode="numeric",length=length(Seals))
+
+for (i in 1:length(Seals)){
+  temp<-subset(dat_PB, sealID==Seals[i])
+  Kamis[i]<-sum(temp$KamiNoSumPerDay)
+  MeanKamis[i]<-mean(temp$KamiNoSumPerDay)
+}
+
+Kamis<-cbind(Seals,Kamis,MeanKamis)
+```
+
+
+## Paper Figures
+
+```{r Kami/Day~Trip, echo=FALSE,warning=FALSE, message = FALSE}
+
+gg1<-ggplot(data=subset(dat_PB, group!="Benthic"),aes(x=dayID, y=KamiNoSumPerDay))+
+  geom_smooth(aes(fill=group, color=group), method="loess")+
+  geom_hline(yintercept=1500, linetype="dashed")+
+  geom_point(data=subset(dat_PB, group=="Sick"), aes(color=group), size=1.5)+
+  scale_color_manual(values=c("royalblue","orange"), name="", labels=c("Normal", "Seal 6018"))+
+  scale_fill_manual(values=c("royalblue", "orange"),name="", labels=c("Normal", "Seal 6018"))+
+  ggthemes::theme_few()+
+  xlim(1,90)+
+  ylim(0,3000)+
+  ylab("Jaw Motions/Day")+
+  xlab("Day of Trip")+
+  theme(panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"),
+                legend.position = "none")
+gg1
+```
+
+
+```{r KamiDepth~Trip, echo=FALSE,warning=FALSE, message = FALSE}
+
+gg2<-ggplot(data=subset(dat_PB, group!="Benthic"),aes(x=dayID, y=KamiDepth))+
+  geom_smooth(aes(fill=group, color=group), method="loess")+
+  geom_point(data=subset(dat_PB, group=="Sick"), aes(color=group), size=1.5)+
+  scale_color_manual(values=c("royalblue","orange"), name="", labels=c("Normal", "Seal 6018"))+
+  scale_fill_manual(values=c("royalblue", "orange"),name="", labels=c("Normal", "Seal 6018"))+
+  ggthemes::theme_few()+
+  xlim(1,90)+
+  ylim(600,100)+
+  ylab("Depth (m)")+
+  xlab("Day of Trip")+
+  theme(panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"),
+                legend.position = "none")
+gg2
+
+```
+
+
+
+```{r Kami~ForagingTime, echo=FALSE,warning=FALSE, message = FALSE}
+
+gg3<-ggplot(data=subset(dat_PB, group!="Benthic"),aes(x=ForDiveDurationSum/60/60/24, y=KamiNoSumPerDay))+
+  stat_density_2d(aes(fill=group, alpha=..level..), geom="polygon", color="transparent")+
+  scale_color_manual(values=c("royalblue","orange"), name="", labels=c("Normal", "Seal 6018"))+
+  scale_fill_manual(values=c("royalblue", "orange"),name="", labels=c("Normal", "Seal 6018"))+
+  ggthemes::theme_few()+
+  ylab("Jaw Motions/Day")+
+  xlab("%Time Foraging")+
+  theme(panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"),
+        legend.position = "none")+
+  scale_x_continuous(label=scales::percent_format(accuracy=1))
+gg3
+
+```
+
+
+```{r Density of Kami Depths, echo=FALSE,warning=FALSE, message = FALSE}
+
+#NOTE THAT THIS MAY TAKE SOME TIME TO CREATE DENSITY DUE TO MANY DATA POINTS 
+gg4<-ggplot(data=subset(z2_PB, group!="Benthic"),aes(y=KamiDepth))+
+  geom_density(aes(fill=group, color=group), orientation="y", alpha=0.5 ,size=1)+
+  scale_color_manual(values=c("royalblue","orange"), name="", labels=c("Normal", "Seal 6018"))+
+  scale_fill_manual(values=c("royalblue", "orange"),name="", labels=c("Normal", "Seal 6018"))+
+  ggthemes::theme_few()+
+  ylab("Depth (m)")+
+  xlab("Jaw Motion Density")+
+  ylim(1500,0)+
+  theme(panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"))+
+  scale_x_continuous(expand=c(0,0),lim=c(0,0.0032))
+
+#extract and save legend from gg4
+legend<-cowplot::get_legend(gg4)
+
+#remove legend from plot
+gg4<-gg4+theme(legend.position="none")
+  
+```
+
+
+```{r Figure 7 - Combined Plot, echo=FALSE}
+
+gg5<-cowplot::plot_grid(gg1,gg2,gg3,gg4, labels="AUTO")
+
+gg6<-cowplot::plot_grid(gg5, legend, rel_widths=c(1,0.2), nrow=1)
+gg6
+
+cairo_ps(filename = "Kami_Combined.eps",
+         width = 10, height = 5, pointsize = 2,
+         fallback_resolution = 500)
+print(gg6)
+dev.off()
+
+```
+
