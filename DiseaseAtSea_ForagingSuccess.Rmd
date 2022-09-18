@@ -1,0 +1,156 @@
+---
+title: "Disease at Sea: Foraging Success"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r Settings, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, fig.width = 9, message=FALSE, error=FALSE)
+
+```
+
+```{r Load Packages}
+library(ggplot2)
+library(mgcv)
+library(MASS)
+library(MuMIn)
+library(NatParksPalettes)
+library(knitr)
+
+```
+
+
+```{r import Data}
+
+ForagingSuccess<-read.csv('ESEAL_FORAGING_2022_REVISED_08-13-22_PBOnly.csv')
+ForagingSuccess<-as.data.frame(ForagingSuccess)
+ForagingSuccess$fYear<-as.factor(ForagingSuccess$Year)
+
+Molt<-subset(ForagingSuccess,Year<=2020)
+ind<-which(Molt$TOPPID==2017001)
+Molt2<-Molt[-c(ind),]
+
+PB2017<-subset(Molt,Year==2017)
+PB2017<-PB2017[-c(1),]
+
+
+```
+
+
+# Foraging Success Statistics
+
+Calculate mean of all post-breeding animals and 2017 post-breeding (excluding 6018)
+
+```{r Basic Stats}
+PBStats<-structure(list(MassGain=numeric(),MassGainSD=numeric(),MassGainRate=numeric(),MassGainRateSD=numeric(),MassGainPct=numeric(),
+                      MassGainPctSD=numeric(),EnergyGain=numeric(),EnergyGainSD=numeric(),EnergyGainRate=numeric(),EnergyGainRateSD=numeric(),
+                      DepartAdipose=numeric(),DepartAdiposeSD=numeric(),ArrivalAdipose=numeric(),ArrivalAdiposeSD=numeric()),class="data.frame")
+
+MassGain<-mean(Molt2$CalcMassGain,na.rm=TRUE)
+MassGainSD<-sd(Molt2$CalcMassGain,na.rm=TRUE)
+MassGainRate<-mean(Molt2$MassGainRate,na.rm=TRUE)
+MassGainRateSD<-sd(Molt2$MassGainRate,na.rm=TRUE)
+MassGainPct<-mean(Molt2$MassGainPercent,na.rm=TRUE)*100
+MassGainPctSD<-sd(Molt2$MassGainPercent,na.rm=TRUE)*100
+EnergyGain<-mean(Molt2$EnergyGain,na.rm=TRUE)
+EnergyGainSD<-sd(Molt2$EnergyGain,na.rm=TRUE)
+EnergyGainRate<-mean(Molt2$EnergyGainRate,na.rm=TRUE)
+EnergyGainRateSD<-sd(Molt2$EnergyGainRate,na.rm=TRUE)
+DepartAdip<-mean(Molt2$DepartCalcAdipose,na.rm=TRUE)*100
+DepartAdipSD<-sd(Molt2$DepartCalcAdipose,na.rm=TRUE)*100
+ArrivalAdip<-mean(Molt2$ArrivalCalcAdipose,na.rm=TRUE)*100
+ArrivalAdipSD<-sd(Molt2$ArrivalCalcAdipose,na.rm=TRUE)*100
+newrow<-data.frame(MassGain,MassGainSD,MassGainRate,MassGainRateSD,MassGainPct,MassGainPctSD,EnergyGain,EnergyGainSD,EnergyGainRate,EnergyGainRateSD,
+                   DepartAdip,DepartAdipSD,ArrivalAdip,ArrivalAdipSD)
+
+PBStats<-rbind(PBStats,newrow)
+
+MassGain[1]<-mean(PB2017$CalcMassGain,na.rm=TRUE)
+MassGainSD<-sd(PB2017$CalcMassGain,na.rm=TRUE)
+MassGainRate<-mean(PB2017$MassGainRate,na.rm=TRUE)
+MassGainRateSD<-sd(PB2017$MassGainRate,na.rm=TRUE)
+MassGainPct<-mean(PB2017$MassGainPercent,na.rm=TRUE)*100
+MassGainPctSD<-sd(PB2017$MassGainPercent,na.rm=TRUE)*100
+EnergyGain<-mean(PB2017$EnergyGain,na.rm=TRUE)
+EnergyGainSD<-sd(PB2017$EnergyGain,na.rm=TRUE)
+EnergyGainRate<-mean(PB2017$EnergyGainRate,na.rm=TRUE)
+EnergyGainRateSD<-sd(PB2017$EnergyGainRate,na.rm=TRUE)
+DepartAdip<-mean(PB2017$DepartCalcAdipose,na.rm=TRUE)*100
+DepartAdipSD<-sd(PB2017$DepartCalcAdipose,na.rm=TRUE)*100
+ArrivalAdip<-mean(PB2017$ArrivalCalcAdipose,na.rm=TRUE)*100
+ArrivalAdipSD<-sd(PB2017$ArrivalCalcAdipose,na.rm=TRUE)*100
+newrow<-data.frame(MassGain,MassGainSD,MassGainRate,MassGainRateSD,MassGainPct,MassGainPctSD,EnergyGain,EnergyGainSD,EnergyGainRate,EnergyGainRateSD,
+                   DepartAdip,DepartAdipSD,ArrivalAdip,ArrivalAdipSD)
+
+PBStats<-rbind(PBStats,newrow)
+
+rm(newrow,MassGainRateSD,MassGainPctSD,MassGainPct,MassGainRate,MassGainSD,MassGain,DeployAdipSD,DeployAdip,RecoverAdipSD,RecoverAdip)
+
+kable(PBStats, 
+      col.names = c('Mass Gain (kg)', 'Mass Gain sd', 'Mass Gain Rate', 'Mass Gain Rate sd', 'Mass Gain Pct', 'Mass Gain Pct sd', 'Energy Gain (MJ)', 'Energy Gain sd', 'Energy Gain Rate','Energy Gain Rate sd','Depart Adipose (%)', 'Depart Adipose sd','Arrival Adipose (%)','Arrival Adipose sd'), 
+      align='cccccccccccccc', digits=c(2,2,2,2,2,2,2,2,2,2,2,2,2,2))
+
+```
+
+
+# Post-Breeding Depart~Arrival Mass
+```{r Figure 1}
+Fig1<-ggplot(data = Molt, aes(y=ArrivalCalcMass, x=DepartCalcMass))+
+  geom_point(aes(fill=ArrivalCalcAdipose*100), size=3, shape=21, stroke=1) + 
+  scale_fill_gradientn(colors=NatParksPalettes::natparks.pals("Arches"))+
+  geom_smooth(data = Molt, aes(y=ArrivalCalcMass, x=DepartCalcMass), color="black", span = 0.5, size=1.25, 
+              inherit.aes=FALSE, method="lm") +
+  labs(y="Molt Arrival Mass (kg)", x="Breeding Departure Mass (kg)") +
+  theme(text = element_text(size=16, face="plain",colour="black"),
+        axis.text.x=element_text(size=14, colour="black"),
+        axis.text.y=element_text(size=14, colour="black"),
+        axis.line = element_line(size=1,colour="black"),
+        plot.background = element_rect(fill="white"),
+        panel.background = element_rect(fill="white"),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"),
+        legend.title = element_blank())
+Fig1
+```
+
+# Surface Area:Volume
+
+Plot SA:V for 6018 compared to other seals of the same season
+
+```{r Figure 8}
+SAV<-read.csv(file =  "D:/Dropbox/Manuscripts/Case Study - 6018/PB2017_SAV_V3.csv")
+SAV$SA.V_sd<-as.numeric(SAV$SA.V_sd)
+
+sav_b<-ggplot(data=subset(SAV,Method=='CircTC'), aes(x=Blubber.Thickness..cm.,y=SA.V_Ank_Nose))+
+  geom_point(aes(shape=Procedure, fill=State, color=State),size=4)+
+  geom_errorbarh(aes(xmin=Blubber.Thickness..cm.-Blubber.Thickness.sd, xmax=Blubber.Thickness..cm.+Blubber.Thickness.sd, 
+                     color=State), height=0.1, size=0.8)+
+  geom_errorbar(aes(ymin=SA.V_Ank_Ears, ymax=SA.V_Tail_Nose, color=State), width=0.25,size=0.8,linetype=5)+
+  scale_color_manual(values=c("royalblue","orange"), name="", labels=c("Normal", "Seal 6018"))+
+  scale_fill_manual(values=c("royalblue", "orange"),name="", labels=c("Normal", "Seal 6018"))+
+    geom_segment(aes(x = 3.3, y = 7.8, xend = 1.5, yend = 9.7), lineend="round",linejoin="round", color="grey44",
+               arrow = arrow(length = unit(0.5, "cm")),size=1.6)+
+  ggthemes::theme_few()+
+  xlab("Blubber Thickness (cm)")+
+  ylab("SA:V")+
+  theme(panel.grid.major = element_line(size=0.3,colour="grey", linetype = "dashed"),
+        text = element_text(size=16, face="plain", colour="black"),
+        axis.text.x=element_text(size=14, colour="black"),
+        axis.text.y=element_text(size=14, colour="black"),
+        legend.title=element_blank(),
+        legend.text=element_text(size=14),)
+  
+sav_b
+
+cairo_ps(filename = "SAV_Blubber.eps",
+         width = 8, height = 5, pointsize = 4,
+         fallback_resolution = 500)
+print(sav_b)
+dev.off()
+
+```
+
