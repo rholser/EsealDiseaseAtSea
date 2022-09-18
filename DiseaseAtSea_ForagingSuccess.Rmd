@@ -122,7 +122,7 @@ Fig1
 Plot SA:V for 6018 compared to other seals of the same season
 
 ```{r Figure 8}
-SAV<-read.csv(file =  "D:/Dropbox/Manuscripts/Case Study - 6018/PB2017_SAV_V3.csv")
+SAV<-read.csv(file =  "PB2017_SAV_V3.csv")
 SAV$SA.V_sd<-as.numeric(SAV$SA.V_sd)
 
 sav_b<-ggplot(data=subset(SAV,Method=='CircTC'), aes(x=Blubber.Thickness..cm.,y=SA.V_Ank_Nose))+
@@ -145,12 +145,6 @@ sav_b<-ggplot(data=subset(SAV,Method=='CircTC'), aes(x=Blubber.Thickness..cm.,y=
         legend.text=element_text(size=14),)
   
 sav_b
-
-cairo_ps(filename = "SAV_Blubber.eps",
-         width = 8, height = 5, pointsize = 4,
-         fallback_resolution = 500)
-print(sav_b)
-dev.off()
 
 ```
 
