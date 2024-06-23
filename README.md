@@ -1,4 +1,6 @@
 # EsealDiseaseAtSea
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7864665.svg)](https://doi.org/10.5281/zenodo.7864665)
+
 Code associated with analysis of movement and foraging success of a northern elephant seal that was ill compared with typical individuals (other post-breeding adult female northern elephant seals).
 
 Data are publicly available through Dryad respositories https://doi.org/10.7291/D1W101 and https://doi.org/10.7291/D18D7W and the Arctic Data archive System of the National Institute of Polar Research (https://ads.nipr.ac.jp/dataset/A20210316-001). 
